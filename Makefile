@@ -1,24 +1,47 @@
-objects = kernel.o port.o gdt.o interrupts.o keyboard.o
+objects = obj/loader.o \
+          obj/gdt.o \
+          obj/drivers/driver.o \
+          obj/hardwarecommunication/port.o \
+          obj/hardwarecommunication/interruptstubs.o \
+          obj/hardwarecommunication/interrupts.o \
+          obj/drivers/keyboard.o \
+          obj/drivers/mouse.o \
+          obj/kernel.o
 
-full: run clean
 
-run: build
-	qemu-system-x86_64 myos.iso 
+GCCPARAMS = -m32 -Iinclude -fno-use-cxa-atexit -nostdlib -fno-builtin -fno-rtti -fno-exceptions -fno-threadsafe-statics -fno-leading-underscore -Wno-write-strings
+ASPARAMS = --32
+LDPARAMS = -melf_i386
+
+
+full: clean run
+
+run: nanos.iso
+	(killall VirtualBoxVM && sleep 1) || true
+	VirtualBoxVM --startvm "NanOS" &
+
+obj/%.o: src/%.cpp
+	mkdir -p $(@D)
+	gcc $(GCCPARAMS) -c -o $@ $<
+
+obj/%.o: src/%.s
+	mkdir -p $(@D)
+	as $(ASPARAMS) -o $@ $<
+
+nanos.bin: linker.ld $(objects)
+	ld $(LDPARAMS) -T $< -o $@ $(objects)
 	
-build: $(objects)
-	as --32 boot.s -o boot.o
-	as --32 interruptstubs.s -o interruptstubs.o
-	g++ -m32 -T linker.ld -o myos.bin -ffreestanding -O2 -nostdlib $(objects) boot.o interruptstubs.o -lgcc
+nanos.iso: nanos.bin
 	mkdir -p isodir/boot/grub
-	cp myos.bin isodir/boot/myos.bin
+	cp nanos.bin isodir/boot/nanos.bin
 	cp grub.cfg isodir/boot/grub/grub.cfg
-	grub-mkrescue -o myos.iso isodir
+	grub-mkrescue -o nanos.iso isodir
 	@echo "\ndone"
 
-%.o: %.cpp
-	g++ -c $< -o $@ -m32 -fno-use-cxa-atexit -nostdlib -fno-builtin -fno-rtti -fno-exceptions -fno-leading-underscore
+
+install: nanos.bin
+	sudo cp nanos.bin /boot/nanos.bin
 
 clean:
-	find . -name '*.o' -delete
-	rm myos.iso
+	rm -rf obj nanos.bin nanos.iso
 	rm -rf isodir
