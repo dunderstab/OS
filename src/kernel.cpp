@@ -2,6 +2,7 @@
 #include <common/types.h>
 #include <gdt.h>
 #include <hardwarecommunication/interrupts.h>
+#include <hardwarecommunication/pci.h>
 #include <drivers/driver.h>
 #include <drivers/keyboard.h>
 #include <drivers/mouse.h>
@@ -11,7 +12,7 @@ using namespace nanos::common;
 using namespace nanos::drivers;
 using namespace nanos::hardwarecommunication;
 
-#define _NANOS_VERSION "version beta 1.0.2"
+#define _NANOS_VERSION "version beta 1.0.3"
 
 void printf_positioned(char* str, uint8_t nx, uint8_t ny)
 {
@@ -174,7 +175,7 @@ extern "C" void kernelMain(const void* multiboot_structure, uint32_t /*multiboot
     GlobalDescriptorTable gdt;
     InterruptManager interrupts(0x20, &gdt);
     
-    printf("Initializing Hardware, Stage 1\n");
+    printf("Initializing Hardware [stage 1]\n");
     
     DriverManager drvManager;
     
@@ -186,11 +187,14 @@ extern "C" void kernelMain(const void* multiboot_structure, uint32_t /*multiboot
         MouseDriver mouse(&interrupts, &mousehandler);
         drvManager.AddDriver(&mouse);
         
+        PeripheralComponentInterconnectController PCIController;
+        PCIController.SelectDrivers(&drvManager);
 
-    printf("Initializing Hardware, Stage 2\n");
+
+    printf("Initializing Hardware [stage 2]\n");
         drvManager.ActivateAll();
         
-    printf("Initializing Hardware, Stage 3\n");
+    printf("Initializing Hardware [stage 3]\n");
     interrupts.Activate();
     printf("Started NanOS { ");
     printf(_NANOS_VERSION);
